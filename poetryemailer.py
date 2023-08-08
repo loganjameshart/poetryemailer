@@ -1,6 +1,5 @@
-#! /usr/bin/python3
-
-"""Scrapes the Poetry Foundation's daily poem page and sends as an email."""
+#! /home/loge/poetryemail/bin/python3
+"""Scrapes a Poetry Foundation's poem page and sends as an email."""
 
 import os
 import requests
@@ -8,7 +7,7 @@ import smtplib
 import datetime
 from bs4 import BeautifulSoup
 
-# change working directory to file location so crontab job works
+# change working directory so cron job works
 
 os.chdir("")
 
@@ -26,9 +25,13 @@ POETRY_LINK = f"https://www.poetryfoundation.org/poems/{str(POEM_NUMBER)}"
 def get_poem(poem_link: str) -> str:
     """Takes a link to Poetry Foundation's website and returns the text of the daily poem."""
     r = requests.get(poem_link)
-    soup = BeautifulSoup(r.text, "html.parser")
-    poem_text = soup.find("div", class_="c-feature").text
-    return poem_text
+    if r.status_code == 200:
+        soup = BeautifulSoup(r.text, "html.parser")
+        poem_text = soup.find("div", class_="c-feature").text
+        return poem_text
+    else:
+        error_log = open("emailerrorlog.txt","a")
+        error_log.write(f"\nCouldn't get poem. Status code is {r.status_code}.")
 
 
 poem = get_poem(POETRY_LINK)
@@ -53,6 +56,5 @@ with smtplib.SMTP(EMAIL_LINK, PORT) as smtp_connection:
 
 POEM_NUMBER = POEM_NUMBER + 1
 POEM_COUNTER.seek(0)
-POEM_COUNTER.truncate()
 POEM_COUNTER.write(str(POEM_NUMBER))
 POEM_COUNTER.close()
