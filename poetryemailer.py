@@ -1,20 +1,23 @@
-#! /home/loge/poetryemail/bin/python3
-"""Scrapes a Poetry Foundation's poem page and sends as an email."""
+#! (venv)/bin python3
+"""Scrapes the Poetry Foundation's daily poem page and sends as an email."""
 
 import os
 import requests
 import smtplib
+from email.message import EmailMessage
 import datetime
 from bs4 import BeautifulSoup
 
-# change working directory so cron job works
+# change working directory to script's path so cron job works
 
 os.chdir("")
 
-POEM_COUNTER = open("poemcounter.txt", "r+")
+POEM_COUNTER = open(
+    "poemcounter.txt", "r+"
+)  # using open instead of context manager since the file is written to at the end of the script
 POEM_NUMBER = int(POEM_COUNTER.read())
 DATE = datetime.datetime.today()
-USERNAME = ""
+SENDER = ""
 APPKEY = ""
 EMAIL_LINK = "smtp.gmail.com"
 PORT = 587
@@ -27,26 +30,30 @@ def get_poem(poem_link: str) -> str:
     r = requests.get(poem_link)
     if r.status_code == 200:
         soup = BeautifulSoup(r.text, "html.parser")
-        poem_text = soup.find("div", class_="c-feature").text
-        return poem_text
+        poem_body = soup.find("div", class_="c-feature").text
+        return poem_body
     else:
-        error_log = open("emailerrorlog.txt","a")
+        error_log = open("emailerrorlog.txt", "a")
         error_log.write(f"\nCouldn't get poem. Status code is {r.status_code}.")
 
 
 poem = get_poem(POETRY_LINK)
 
-message = f"From: {USERNAME}\r\nTo: {RECIPIENT}\r\nSubject: Poem of the Day {DATE}\r\n{poem}\r\n".encode(
-    "utf-8"
-)
+# build email message
+
+message = EmailMessage()
+message["Subject"] = f"Poem of the Day for {DATE}"
+message["From"] = SENDER
+message["To"] = RECIPIENT
+message.set_content(poem)
 
 with smtplib.SMTP(EMAIL_LINK, PORT) as smtp_connection:
     smtp_connection.ehlo()
     smtp_connection.starttls()
     try:
-        smtp_connection.login(USERNAME, APPKEY)
+        smtp_connection.login(SENDER, APPKEY)
         smtp_connection.ehlo()
-        smtp_connection.sendmail(USERNAME, RECIPIENT, message)
+        smtp_connection.send_message(message)
     except Exception as e:
         error_log = open("emailerrorlog.txt", "a")
         error_log.write(f"\nCouldn't send email on {DATE}.Error is as follows:\n{e}\n")
